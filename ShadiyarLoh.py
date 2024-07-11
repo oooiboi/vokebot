@@ -81,7 +81,20 @@ def process_question_step(message):
     # Here you can handle the message containing the question
     # For example, save it or send it to an admin
     bot.reply_to(message, user_output)
-    bot.send_message(message.chat.id, "Do you want to return to the menu?", reply_markup=generate_main_menu())
+    bot.send_message(message.chat.id, "if you want to ask another question. Press question button in the menu", reply_markup=generate_submenu())
+
+
+def more_question(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    btn1 = types.KeyboardButton('Yes')
+    btn2 = types.KeyboardButton('No')
+    markup.add(btn1)
+    markup.add(btn2)
+    if message.text=="Yes":
+        handle_question()
+    if message.text=="No":
+        bot.send_message(message.chat.id, "Do you want to return to main menu?", reply_markup=generate_main_menu())
+
 
 # Handle 'Consultation' button
 @bot.message_handler(func=lambda message: message.text == "Consultation")
