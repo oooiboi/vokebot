@@ -1,7 +1,7 @@
 import telebot
 from telebot import types
 from Gemini import get_response_from_gemini
-from user import User
+from user import mycursor, db
 
 # Your bot token (keep this secure!)
 TOKEN = '7447014134:AAEIDJfDEqI8iA_POXnRhPPc4_LZXbG9Tf0'
@@ -10,6 +10,13 @@ topics = ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5"]
 
 user_data = {}
 
+class User:
+    def __init__(self):
+        self.name = None
+        self.phone = None
+        self.countries = None
+        self.school = None
+        self.grade = None
 
 
 input = "Hi"
@@ -51,7 +58,64 @@ def generate_submenu():
 # Send main menu message
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.send_message(message.chat.id, "This is Voke's Chat Bot. Choose an option:", reply_markup=generate_main_menu())
+    chat_id = message.chat.id
+    user_data[chat_id] = User()
+    msg = bot.reply_to(message, "This is Voke's Chat Bot. What's your name?")
+    bot.register_next_step_handler(msg, process_name_step)
+
+
+def process_name_step(message):
+    chat_id = message.chat.id
+    name = message.text
+    user = user_data[chat_id]
+    user.name = name
+    msg = bot.reply_to(message, "What's your phone number?")
+    bot.register_next_step_handler(msg, process_phone_step)
+
+def process_phone_step(message):
+    chat_id = message.chat.id
+    phone = message.text
+    user = user_data[chat_id]
+    user.phone = phone
+    msg = bot.reply_to(message, "Which countries are you interested in applying to?")
+    bot.register_next_step_handler(msg, process_countries_step)
+
+def process_countries_step(message):
+    chat_id = message.chat.id
+    countries = message.text
+    user = user_data[chat_id]
+    user.countries = countries
+    msg = bot.reply_to(message, "What is the name of your school?")
+    bot.register_next_step_handler(msg, process_school_step)
+
+def process_school_step(message):
+    chat_id = message.chat.id
+    school = message.text
+    user = user_data[chat_id]
+    user.school = school
+    msg = bot.reply_to(message, "Which grade are you in?")
+    bot.register_next_step_handler(msg, process_grade_step)
+
+def process_grade_step(message):
+    chat_id = message.chat.id
+    grade = message.text
+    user = user_data[chat_id]
+    user.grade = grade
+    
+    # Store in the database
+    store_user_data(chat_id, user.name, user.phone, user.countries, user.school, user.grade)
+    
+    bot.send_message(chat_id, "Thank you, we have received your information. Now choose option from the menu", reply_markup=generate_submenu())
+
+# Mock database storage function
+def store_user_data(chat_id, name, phone, countries, school, grade):
+    # Here you would connect to your database and store the details
+    mycursor.execute("INSERT INTO Users_final (name, countries, school, phone, grade) VALUES (%s,%s,%s,%s,%s)",(name, phone, countries, school, grade))
+    db.commit()
+
+
+
+
 
 @bot.message_handler(func=lambda message: True)
 def menu_handler(message):
