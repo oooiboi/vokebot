@@ -8,9 +8,9 @@ db = mysql.connector.connect(
 )
 
 mycursor = db.cursor()
-
-mycursor.execute("CREATE TABLE IF NOT EXISTS Users_final (name VARCHAR(255) NOT NULL, countries VARCHAR(255) NOT NULL, school VARCHAR(255) NOT NULL, phone VARCHAR(255) NOT NULL, grade INT NOT NULL)")
-
+     
+        # Commit the changes to the database
+db.commit()
 
 
 

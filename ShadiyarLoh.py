@@ -12,11 +12,14 @@ user_data = {}
 
 class User:
     def __init__(self):
+        self.chat_id= None
         self.name = None
         self.phone = None
         self.countries = None
         self.school = None
         self.grade = None
+        self.consultation = None
+        self.consultation_details = None
 
 
 input = "Hi"
@@ -60,6 +63,7 @@ def generate_submenu():
 def send_welcome(message):
     chat_id = message.chat.id
     user_data[chat_id] = User()
+    user = user_data[chat_id]
     msg = bot.reply_to(message, "This is Voke's Chat Bot. What's your name?")
     bot.register_next_step_handler(msg, process_name_step)
 
@@ -68,6 +72,7 @@ def process_name_step(message):
     chat_id = message.chat.id
     name = message.text
     user = user_data[chat_id]
+    user.chat_id = chat_id
     user.name = name
     msg = bot.reply_to(message, "What's your phone number?")
     bot.register_next_step_handler(msg, process_phone_step)
@@ -103,14 +108,14 @@ def process_grade_step(message):
     user.grade = grade
     
     # Store in the database
-    store_user_data(chat_id, user.name, user.phone, user.countries, user.school, user.grade)
+    store_user_data(user.chat_id, user.name, user.phone, user.countries, user.school, user.grade)
     
     bot.send_message(chat_id, "Thank you, we have received your information. Now choose option from the menu", reply_markup=generate_submenu())
 
 # Mock database storage function
 def store_user_data(chat_id, name, phone, countries, school, grade):
     # Here you would connect to your database and store the details
-    mycursor.execute("INSERT INTO Users_final (name, countries, school, phone, grade) VALUES (%s,%s,%s,%s,%s)",(name, phone, countries, school, grade))
+    mycursor.execute("INSERT INTO Users_final (chat_id, name, countries, school, phone, grade) VALUES (%s,%s,%s,%s,%s,%s)",(chat_id, name, phone, countries, school, grade))
     db.commit()
 
 
@@ -169,19 +174,35 @@ def handle_consultation(message):
         btn = types.KeyboardButton(f'{topics[i]}')
         markup.add(btn)
     msg = bot.reply_to(message, "Choose a topic for consultation:", reply_markup=markup)
-    bot.register_next_step_handler(msg, process_consultation_step)
+    bot.register_next_step_handler(msg, handle_consultation)
 
 @bot.message_handler(func=lambda message: message.text == "Consultation")
 def handle_consultation(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     # Here you would dynamically generate the consultation topics
-    msg = bot.reply_to(message, "Now we need your contact details. Please write your full name in Russian or English:", reply_markup=markup)
+    chat_id = message.chat.id
+    msg = bot.reply_to(message, "Now we need to know what you want from consultation. Please write what you want from the consultation.", reply_markup=markup)
+    user = user_data[chat_id]
+    user.consultation = 1
     bot.register_next_step_handler(msg, process_consultation_step)
+    
 
 def process_consultation_step(message):
     # Here you would handle the chosen consultation topic
+    chat_id = message.chat.id
+    user = user_data[chat_id]
+    user.consultation_details = message.text
     bot.reply_to(message, f"You've selected {message.text}, we will respond to you shortly.")
     bot.send_message(message.chat.id, "Do you want to return to the menu?", reply_markup=generate_main_menu())
+    
+    # Update consultation details. Ensure you have a WHERE clause to update the right user!
+    mycursor.execute("""
+        UPDATE Users_final 
+        SET consultation = %s, consultation_details = %s 
+        WHERE chat_id = %s
+    """, (1, user.consultation_details, chat_id))
+    
+    db.commit()
 
 # Handle 'Support' button
 @bot.message_handler(func=lambda message: message.text == "Support")
