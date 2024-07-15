@@ -115,7 +115,7 @@ def process_grade_step(message):
 # Mock database storage function
 def store_user_data(chat_id, name, phone, countries, school, grade):
     # Here you would connect to your database and store the details
-    mycursor.execute("INSERT INTO Users_final (chat_id, name, countries, school, phone, grade) VALUES (%s,%s,%s,%s,%s,%s)",(chat_id, name, phone, countries, school, grade))
+    mycursor.execute("INSERT INTO Users_final (chat_id, name, countries, school, phone, grade) VALUES (%s,%s,%s,%s,%s,%s)",(chat_id, name, countries, school, phone, grade))
     db.commit()
 
 
@@ -219,7 +219,8 @@ def process_support_step(message):
 # Handle 'Traction' button
 @bot.message_handler(func=lambda message: message.text == "Traction")
 def handle_traction(message):
-    msg = bot.reply_to(message, "Please share your name or nickname and the goals or exams you want to prepare for.")
+    
+    msg = bot.reply_to(message, "Please share your long-term goals or exams you want to prepare for. Then you will divide it to small steps for every day")
     #цель, класс, школа. 
     #
     bot.register_next_step_handler(msg, process_traction_step)
