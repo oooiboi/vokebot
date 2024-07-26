@@ -313,7 +313,14 @@ def schedule_single_reminder(hours, chat_id):
 # Run the bot
 
 # Run the scheduler in a separate thread
-schedule.run_pending()
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+schedule_thread = threading.Thread(targegt=run_scheduler)
+schedule_thread.start()
+
 # Polling
 bot.polling(none_stop=True)    
 
