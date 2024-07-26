@@ -2,12 +2,18 @@ import telebot
 from telebot import types
 from Gemini import get_response_from_gemini
 from user import mycursor, db
+import schedule
+import time
+import threading
+from datetime import datetime, timedelta, time
+import mysql.connector
+import random
 
 # Your bot token (keep this secure!)
 TOKEN = '7447014134:AAEIDJfDEqI8iA_POXnRhPPc4_LZXbG9Tf0'
 bot = telebot.TeleBot(TOKEN)
 topics = ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5"]
-
+reminder_time = time(18, 53, 00).strftime("%H:%M")
 user_data = {}
 
 class User:
@@ -20,6 +26,9 @@ class User:
         self.grade = None
         self.consultation = None
         self.consultation_details = None
+        self.traction_started = False
+        self.streak = 0
+        self.goals = None
 
 
 input = "Hi"
@@ -77,6 +86,7 @@ def process_name_step(message):
     msg = bot.reply_to(message, "What's your phone number?")
     bot.register_next_step_handler(msg, process_phone_step)
 
+
 def process_phone_step(message):
     chat_id = message.chat.id
     phone = message.text
@@ -115,7 +125,7 @@ def process_grade_step(message):
 # Mock database storage function
 def store_user_data(chat_id, name, phone, countries, school, grade):
     # Here you would connect to your database and store the details
-    mycursor.execute("INSERT INTO Users_final (chat_id, name, countries, school, phone, grade) VALUES (%s,%s,%s,%s,%s,%s)",(chat_id, name, countries, school, phone, grade))
+    mycursor.execute("INSERT INTO Users_final (chat_id, name, countries, school, phone, grade, traction_started, streak) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",(chat_id, name, countries, school, phone, grade, False, 0))
     db.commit()
 
 
@@ -207,12 +217,7 @@ def process_consultation_step(message):
 # Handle 'Support' button
 @bot.message_handler(func=lambda message: message.text == "Support")
 def handle_support(message):
-    msg = bot.reply_to(message, "What is your concern?")
-    bot.register_next_step_handler(msg, process_support_step)
-
-def process_support_step(message):
-    # Here you would handle the message containing the support request
-    bot.reply_to(message, "Thank you for contacting support, we will get back to you soon!")
+    msg = bot.reply_to(message, "Please write all your concerns to @vokecom telegram and we will answer you")
     bot.send_message(message.chat.id, "Do you want to return to the menu?", reply_markup=generate_main_menu())
     
 
@@ -221,17 +226,94 @@ def process_support_step(message):
 def handle_traction(message):
     
     msg = bot.reply_to(message, "Please share your long-term goals or exams you want to prepare for. Then you will divide it to small steps for every day")
-    #цель, класс, школа. 
-    #
+    #цель
+    chat_id = message.chat.id
+    user = user_data[chat_id]
+    user.traction_started = True
+    mycursor.execute("""
+        UPDATE Users_final 
+        SET traction_started = %s
+        WHERE chat_id = %s
+    """, (user.traction_started, chat_id))
+    
+    db.commit()
     bot.register_next_step_handler(msg, process_traction_step)
 
 def process_traction_step(message):
     # Here you would handle the message containing the traction request
     # Presumably, you'll set up some kind of reminder system
-    bot.reply_to(message, "Thanks! We've recorded your details and will send you daily reminders.")
+    chat_id = message.chat.id
+    user = user_data[chat_id]
+    user.goals = message.text
+    mycursor.execute("""
+        UPDATE Users_final 
+        SET goals = %s
+        WHERE chat_id = %s
+    """, (user.goals, chat_id))
+    db.commit()
+    bot.reply_to(message, f"Thanks! We've recorded your details about {user.goals} and will send you daily reminders.")
     bot.send_message(message.chat.id, "Do you want to return to the menu?", reply_markup=generate_main_menu())
+    schedule_first_reminder(message.chat.id)
 
 
+
+def check():
+    print("I am working...")
+
+def schedule_first_reminder(chat_id):
+    # This function schedules the first reminder for the next day
+    reminder_time = time(18, 10, 00).strftime("%H:%M")
+    schedule.every().day.at(reminder_time).do(check)
+    schedule.every().day.at(reminder_time).do(send_reminder, chat_id)
+
+def send_reminder(chat_id):
+    # This sends the actual reminder to the user
+    bot.send_message(chat_id, "Have you done something today to achieve your goal? Reply with Yes or No.")
+
+@bot.message_handler(func=lambda message: message.text.lower() in ['yes', 'no'])
+def handle_activity_response(message):
+    chat_id = message.chat.id
+    user = user_data[chat_id]
+    
+
+    if message.text.lower() == 'yes':
+        msg = bot.reply_to(message, "Please describe what you did today.")
+        bot.register_next_step_handler(msg, save_activity_description)
+        user.streak +=1
+    else:       
+        schedule_single_reminder(3, message.chat.id)
+        user.streak = 0
+
+    mycursor.execute("""
+        UPDATE Users_final 
+        SET streak = %s
+        WHERE chat_id = %s
+    """, (user.streak, chat_id))
+
+    db.commit()
+
+def save_activity_description(message):
+    activity_id = random.randint(10000, 99999)  # Generate a random activity ID
+    chat_id = message.chat.id
+    add_activity = ("INSERT INTO useractivity "
+                   "(activity_id, chat_id, activity_date, activity_done, activity_description) "
+                   "VALUES (%s, %s, %s, %s, %s)")
+    data_activity = (activity_id, chat_id, datetime.now(), True, message.text)
+    mycursor.execute(add_activity, data_activity)
+    
+    db.commit()
+    schedule_first_reminder(message.chat.id)
+
+def schedule_single_reminder(hours, chat_id):
+    reminder_time = datetime.now() + timedelta(hours=3)
+    schedule.every().at(reminder_time.strftime("%H:%M")).do(send_reminder, chat_id).tag(f"reminder_{chat_id}")
+    # Clear the schedule after the reminder has been sent
+    schedule.clear(f"reminder_{chat_id}")
+
+# Run the bot
+
+# Run the scheduler in a separate thread
+schedule.run_pending()
 # Polling
 bot.polling(none_stop=True)    
 

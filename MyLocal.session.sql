@@ -1,2 +1,2 @@
-ALTER TABLE Users_final
-ADD COLUMN streak INT NULL;
+
+DELETE FROM users_final 
